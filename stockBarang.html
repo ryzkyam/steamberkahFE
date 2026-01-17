@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Manajemen Stok Barang - REAZ STEAM MOTOR</title>
+    <link
+        href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+    />
+    <style>
+        :root {
+            --primary-color: #1e3a8a;
+            --secondary-color: #f9fafb;
+            --accent-color: #3b82f6;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --card-bg: #ffffff;
+            --text-dark: #111827;
+        }
+        body {
+            font-family: "Inter", sans-serif;
+            background-color: var(--secondary-color);
+            color: var(--text-dark);
+        }
+        .container {
+            max-width: 1400px;
+            padding-top: 40px;
+            padding-bottom: 40px;
+        }
+        .card {
+            border: none;
+            border-radius: 1.25rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.08);
+        }
+        .card-header {
+            font-weight: 600;
+            font-size: 1.1rem;
+            background: linear-gradient(90deg, #1e3a8a, #3b82f6);
+            color: #fff;
+            border-radius: 1.25rem 1.25rem 0 0;
+            padding: 15px 25px;
+        }
+        .table-responsive {
+            border-radius: 1rem;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+        .table th {
+            background-color: var(--primary-color);
+            color: #fff;
+            border: none;
+            font-weight: 600;
+        }
+        .table td {
+            border-bottom: 1px solid #f3f4f6;
+            vertical-align: middle;
+        }
+        .btn {
+            border-radius: 0.75rem;
+            font-weight: 600;
+        }
+        .btn-primary {
+            background-color: var(--accent-color);
+            border: none;
+        }
+        .form-control {
+            border-radius: 0.75rem;
+        }
+        
+        /* Utility Styles */
+        .text-stock-low { color: var(--danger-color); font-weight: 700; }
+    </style>
+    <script>
+    // 1. Cek apakah ada data username di LocalStorage
+    const user = localStorage.getItem("username");
+
+    // 2. Kalau GAK ADA, langsung tendang balik ke login.html
+    if (!user) {
+        window.location.href = "login.html";
+    }
+</script>
+</head>
+<body>
+    <div class="container">
+        <div class="mb-4">
+            <a href="index.html" class="btn btn-light mb-3">
+                ← Kembali ke Dashboard
+            </a>
+            <h1>📦 Manajemen Stok Barang</h1>
+            <p class="text-muted">Kelola inventaris dan perlengkapan cuci motor.</p>
+        </div>
+
+        <div class="d-flex justify-content-end mb-3">
+            <button
+                class="btn btn-success"
+                data-bs-toggle="modal"
+                data-bs-target="#barangModal"
+                onclick="resetForm()"
+            >
+                ➕ Tambah Barang Baru
+            </button>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                Daftar Stok Inventaris
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-striped align-middle">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Nama Barang</th>
+                                <th>Kategori</th>
+                                <th class="text-end">Harga Pokok</th>
+                                <th class="text-center">Stok</th>
+                                <th class="text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stockTableBody">
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-3">
+                                    Memuat data stok...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="barangModal" tabindex="-1" aria-labelledby="barangModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="barangModalLabel">Tambah Barang Baru</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="barangForm">
+                    <div class="modal-body">
+                        <input type="hidden" id="barangId" />
+                        
+                        <div class="mb-3">
+                            <label for="namaBarang" class="form-label">Nama Barang</label>
+                            <input type="text" class="form-control" id="namaBarang" required />
+                        </div>
+                        <div class="mb-3">
+                            <label for="kategori" class="form-label">Kategori</label>
+                            <select class="form-select" id="kategori" required>
+                                <option value="Peralatan">Peralatan</option>
+                                <option value="Bahan Kimia">Bahan Kimia</option>
+                                <option value="Suku Cadang">Suku Cadang</option>
+                                <option value="Lainnya">Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="harga" class="form-label">Harga Pokok (Rp)</label>
+                            <input type="number" class="form-control" id="harga" min="0" required />
+                        </div>
+                        <div class="mb-3">
+                            <label for="jumlahStock" class="form-label">Jumlah Stok</label>
+                            <input type="number" class="form-control" id="jumlahStock" min="0" required />
+                        </div>
+                        
+                        <div class="alert mt-3 d-none" role="alert" id="formResponse"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
+                        <button type="submit" class="btn btn-primary" id="saveButton">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const API_BASE_URL = "http://localhost:5000/api";
+        const STOCK_ENDPOINT = "Barang"; // Asumsi API endpoint untuk stok barang adalah 'Barang'
+
+        // Utility: Format Rupiah
+        const formatRupiah = (number) =>
+            new Intl.NumberFormat("id-ID", {
+                style: "currency",
+                currency: "IDR",
+                minimumFractionDigits: 0,
+            }).format(number);
+
+        // Utility: Fetch Handler
+        async function handleFetch(endpoint, method = "GET", data = null) {
+            const url = `${API_BASE_URL}/${endpoint}`;
+            const options = {
+                method,
+                headers: { "Content-Type": "application/json" },
+            };
+            if (data) options.body = JSON.stringify(data);
+            
+            try {
+                const res = await fetch(url, options);
+                // Cek jika DELETE/POST/PUT tidak mengembalikan body
+                if (res.status === 204 || res.status === 201) return true; 
+                
+                const result = await res.json();
+                if (res.ok) return result;
+                else throw { status: res.status, data: result };
+            } catch (err) {
+                if (!err.status)
+                    throw { status: 0, data: { message: "NETWORK ERROR: Pastikan API berjalan." } };
+                throw err;
+            }
+        }
+
+        // --- READ (Load Data) ---
+        async function loadStockData() {
+            const tableBody = document.getElementById("stockTableBody");
+            tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-3">Memuat data stok...</td></tr>';
+
+            try {
+                const stockList = await handleFetch(STOCK_ENDPOINT, "GET");
+
+                if (!stockList || stockList.length === 0) {
+                    tableBody.innerHTML =
+                        '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada barang dalam stok. Tambahkan yang baru.</td></tr>';
+                    return;
+                }
+
+                tableBody.innerHTML = stockList
+                    .map((item) => {
+                        const stockClass = item.jumlahStock <= 5 ? 'text-stock-low' : '';
+                        
+                        return `
+                            <tr>
+                                <td>${item.id}</td>
+                                <td>${item.namaBarang}</td>
+                                <td>${item.kategori}</td>
+                                <td class="text-end">${formatRupiah(item.harga)}</td>
+                                <td class="text-center ${stockClass}">${item.jumlahStock}</td>
+                                <td class="text-center">
+                                    <button class="btn btn-sm btn-warning me-2" onclick="editBarang(${item.id})">
+                                        Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteBarang(${item.id}, '${item.namaBarang}')">
+                                        Hapus
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    })
+                    .join("");
+            } catch (err) {
+                console.error("Error loading stock data:", err);
+                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Gagal memuat data stok. ${err.data?.message || 'Error jaringan.'}</td></tr>`;
+            }
+        }
+
+        // --- CREATE / UPDATE (Submit Form) ---
+        document.getElementById("barangForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            
+            const id = document.getElementById("barangId").value;
+            const isUpdate = id !== "";
+            
+            const data = {
+                namaBarang: document.getElementById("namaBarang").value,
+                kategori: document.getElementById("kategori").value,
+                harga: parseFloat(document.getElementById("harga").value),
+                jumlahStock: parseInt(document.getElementById("jumlahStock").value),
+            };
+
+            // Jika update, ID harus disertakan ke data
+            if (isUpdate) {
+                data.id = parseInt(id);
+            }
+            
+            const formResponse = document.getElementById("formResponse");
+            formResponse.className = "alert mt-3";
+            formResponse.textContent = isUpdate ? "Memperbarui barang..." : "Menambah barang...";
+            formResponse.classList.remove("d-none", "alert-success", "alert-danger");
+            formResponse.classList.add("alert-warning");
+
+            try {
+                if (isUpdate) {
+                    await handleFetch(`${STOCK_ENDPOINT}/${id}`, "PUT", data);
+                    formResponse.textContent = "✅ Barang berhasil diperbarui!";
+                } else {
+                    await handleFetch(STOCK_ENDPOINT, "POST", data);
+                    formResponse.textContent = "✅ Barang berhasil ditambahkan!";
+                }
+                
+                formResponse.classList.remove("alert-warning");
+                formResponse.classList.add("alert-success");
+                
+                // Tutup modal setelah sukses dan refresh data
+                setTimeout(() => {
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('barangModal'));
+                    if(modal) modal.hide();
+                    loadStockData();
+                }, 1000);
+                
+            } catch (err) {
+                console.error(err);
+                formResponse.textContent = `❌ Gagal: ${err.data?.message || 'Cek koneksi API.'}`;
+                formResponse.classList.remove("alert-warning");
+                formResponse.classList.add("alert-danger");
+            }
+        });
+
+        // --- EDIT (Populate Form) ---
+        async function editBarang(id) {
+            try {
+                const item = await handleFetch(`${STOCK_ENDPOINT}/${id}`, "GET");
+                
+                document.getElementById("barangId").value = item.id;
+                document.getElementById("namaBarang").value = item.namaBarang;
+                document.getElementById("kategori").value = item.kategori;
+                document.getElementById("harga").value = item.harga;
+                document.getElementById("jumlahStock").value = item.jumlahStock;
+                
+                document.getElementById("barangModalLabel").textContent = `Edit Barang: ${item.namaBarang}`;
+                document.getElementById("saveButton").textContent = "Update Stok";
+                
+                document.getElementById("formResponse").classList.add("d-none");
+
+                const modal = new bootstrap.Modal(document.getElementById('barangModal'));
+                modal.show();
+
+            } catch (err) {
+                alert(`Gagal memuat data barang: ${err.data?.message || 'Error jaringan.'}`);
+            }
+        }
+
+        // --- DELETE ---
+        async function deleteBarang(id, nama) {
+            if (!confirm(`Yakin ingin menghapus barang "${nama}"? Aksi ini tidak bisa dibatalkan.`)) {
+                return;
+            }
+
+            try {
+                await handleFetch(`${STOCK_ENDPOINT}/${id}`, "DELETE");
+                alert(`✅ Barang "${nama}" berhasil dihapus.`);
+                loadStockData();
+            } catch (err) {
+                alert(`❌ Gagal menghapus barang: ${err.data?.message || 'Error jaringan.'}`);
+            }
+        }
+
+        // Utility: Reset Form untuk mode Tambah Baru
+        function resetForm() {
+            document.getElementById("barangForm").reset();
+            document.getElementById("barangId").value = "";
+            document.getElementById("barangModalLabel").textContent = "Tambah Barang Baru";
+            document.getElementById("saveButton").textContent = "Simpan";
+            document.getElementById("formResponse").classList.add("d-none");
+        }
+
+        // Panggil saat halaman dimuat
+        document.addEventListener("DOMContentLoaded", loadStockData);
+    </script>
+</body>
+</html>
