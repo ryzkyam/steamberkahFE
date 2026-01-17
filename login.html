@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
   <head>
     <meta charset="UTF-8" />
@@ -61,6 +61,7 @@
       }
     </style>
   </head>
+
   <body>
     <div class="login-card">
       <div class="login-header">
@@ -108,23 +109,19 @@
         </div>
       </form>
     </div>
+    <script src="config.js"></script>
+
     <script>
-      // Fungsi untuk memunculkan Alert Bootstrap secara dinamis
       const showAlert = (message, type) => {
         const alertPlaceholder = document.getElementById("alertPlaceholder");
         const wrapper = document.createElement("div");
         wrapper.innerHTML = [
           `<div class="alert alert-${type} alert-dismissible fade show" role="alert" style="border-radius: 0.75rem;">`,
-          `   <div><i class="bi ${
-            type === "success"
-              ? "bi-check-circle-fill"
-              : "bi-exclamation-triangle-fill"
-          } me-2"></i>${message}</div>`,
+          `   <div><i class="bi ${type === "success" ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-2"></i>${message}</div>`,
           '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
           "</div>",
         ].join("");
-
-        alertPlaceholder.innerHTML = ""; // Bersihkan alert lama
+        alertPlaceholder.innerHTML = "";
         alertPlaceholder.append(wrapper);
       };
 
@@ -132,13 +129,13 @@
         .getElementById("loginForm")
         .addEventListener("submit", async (e) => {
           e.preventDefault();
-
           const usernameInput = document.getElementById("username").value;
           const passwordInput = document.getElementById("password").value;
 
           try {
+            // 2. Pake CONFIG.API_BASE_URL bro! Lebih rapi
             const response = await fetch(
-              "http://localhost:5000/api/auth/login",
+              `${window.CONFIG.API_BASE_URL}/auth/login`,
               {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -146,25 +143,23 @@
                   username: usernameInput,
                   password: passwordInput,
                 }),
-              }
+              },
             );
 
             const data = await response.json();
 
             if (response.ok) {
-              // Alert Sukses
               showAlert("Login Berhasil! Mengalihkan...", "success");
-
               localStorage.setItem("username", data.username);
               localStorage.setItem("role", data.role);
-
-              // Kasih delay dikit biar user sempet liat alert suksesnya
               setTimeout(() => {
                 window.location.href = "index.html";
               }, 1500);
             } else {
-              // Alert Gagal (Pesan dari Backend .NET lu)
-              showAlert(data || "Username atau Password salah!", "danger");
+              showAlert(
+                data.message || "Username atau Password salah!",
+                "danger",
+              );
             }
           } catch (err) {
             console.error(err);

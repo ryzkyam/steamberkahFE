@@ -178,187 +178,173 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script>
-        const API_BASE_URL = "http://localhost:5000/api";
-        const STOCK_ENDPOINT = "Barang"; // Asumsi API endpoint untuk stok barang adalah 'Barang'
+    <script src="config.js"></script> <script>
+    // 1. Ambil URL secara dinamis dari config.js
+    const API_BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : "http://localhost:5127/api";
+    const STOCK_ENDPOINT = "Barang"; 
 
-        // Utility: Format Rupiah
-        const formatRupiah = (number) =>
-            new Intl.NumberFormat("id-ID", {
-                style: "currency",
-                currency: "IDR",
-                minimumFractionDigits: 0,
-            }).format(number);
+    // Utility: Format Rupiah
+    const formatRupiah = (number) =>
+        new Intl.NumberFormat("id-ID", {
+            style: "currency",
+            currency: "IDR",
+            minimumFractionDigits: 0,
+        }).format(number);
 
-        // Utility: Fetch Handler
-        async function handleFetch(endpoint, method = "GET", data = null) {
-            const url = `${API_BASE_URL}/${endpoint}`;
-            const options = {
-                method,
-                headers: { "Content-Type": "application/json" },
-            };
-            if (data) options.body = JSON.stringify(data);
+    // Utility: Fetch Handler
+    async function handleFetch(endpoint, method = "GET", data = null) {
+        const url = `${API_BASE_URL}/${endpoint}`;
+        const options = {
+            method,
+            headers: { "Content-Type": "application/json" },
+        };
+        if (data) options.body = JSON.stringify(data);
+        
+        try {
+            const res = await fetch(url, options);
+            if (res.status === 204 || res.status === 201) return true; 
             
-            try {
-                const res = await fetch(url, options);
-                // Cek jika DELETE/POST/PUT tidak mengembalikan body
-                if (res.status === 204 || res.status === 201) return true; 
-                
-                const result = await res.json();
-                if (res.ok) return result;
-                else throw { status: res.status, data: result };
-            } catch (err) {
-                if (!err.status)
-                    throw { status: 0, data: { message: "NETWORK ERROR: Pastikan API berjalan." } };
-                throw err;
-            }
+            // Mengatasi response kosong agar tidak crash saat .json()
+            const text = await res.text();
+            const result = text ? JSON.parse(text) : {};
+
+            if (res.ok) return result;
+            else throw { status: res.status, data: result };
+        } catch (err) {
+            if (!err.status)
+                throw { status: 0, data: { message: "NETWORK ERROR: Cek API/Tunnel Anda." } };
+            throw err;
         }
+    }
 
-        // --- READ (Load Data) ---
-        async function loadStockData() {
-            const tableBody = document.getElementById("stockTableBody");
-            tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-3">Memuat data stok...</td></tr>';
+    // --- READ (Load Data) ---
+    async function loadStockData() {
+        const tableBody = document.getElementById("stockTableBody");
+        tableBody.innerHTML = '<tr><td colspan="6" class="text-center py-3"><div class="spinner-border spinner-border-sm text-primary"></div> Memuat stok...</td></tr>';
 
-            try {
-                const stockList = await handleFetch(STOCK_ENDPOINT, "GET");
+        try {
+            const stockList = await handleFetch(STOCK_ENDPOINT, "GET");
 
-                if (!stockList || stockList.length === 0) {
-                    tableBody.innerHTML =
-                        '<tr><td colspan="6" class="text-center text-muted py-3">Tidak ada barang dalam stok. Tambahkan yang baru.</td></tr>';
-                    return;
-                }
-
-                tableBody.innerHTML = stockList
-                    .map((item) => {
-                        const stockClass = item.jumlahStock <= 5 ? 'text-stock-low' : '';
-                        
-                        return `
-                            <tr>
-                                <td>${item.id}</td>
-                                <td>${item.namaBarang}</td>
-                                <td>${item.kategori}</td>
-                                <td class="text-end">${formatRupiah(item.harga)}</td>
-                                <td class="text-center ${stockClass}">${item.jumlahStock}</td>
-                                <td class="text-center">
-                                    <button class="btn btn-sm btn-warning me-2" onclick="editBarang(${item.id})">
-                                        Edit
-                                    </button>
-                                    <button class="btn btn-sm btn-danger" onclick="deleteBarang(${item.id}, '${item.namaBarang}')">
-                                        Hapus
-                                    </button>
-                                </td>
-                            </tr>
-                        `;
-                    })
-                    .join("");
-            } catch (err) {
-                console.error("Error loading stock data:", err);
-                tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Gagal memuat data stok. ${err.data?.message || 'Error jaringan.'}</td></tr>`;
-            }
-        }
-
-        // --- CREATE / UPDATE (Submit Form) ---
-        document.getElementById("barangForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            
-            const id = document.getElementById("barangId").value;
-            const isUpdate = id !== "";
-            
-            const data = {
-                namaBarang: document.getElementById("namaBarang").value,
-                kategori: document.getElementById("kategori").value,
-                harga: parseFloat(document.getElementById("harga").value),
-                jumlahStock: parseInt(document.getElementById("jumlahStock").value),
-            };
-
-            // Jika update, ID harus disertakan ke data
-            if (isUpdate) {
-                data.id = parseInt(id);
-            }
-            
-            const formResponse = document.getElementById("formResponse");
-            formResponse.className = "alert mt-3";
-            formResponse.textContent = isUpdate ? "Memperbarui barang..." : "Menambah barang...";
-            formResponse.classList.remove("d-none", "alert-success", "alert-danger");
-            formResponse.classList.add("alert-warning");
-
-            try {
-                if (isUpdate) {
-                    await handleFetch(`${STOCK_ENDPOINT}/${id}`, "PUT", data);
-                    formResponse.textContent = "✅ Barang berhasil diperbarui!";
-                } else {
-                    await handleFetch(STOCK_ENDPOINT, "POST", data);
-                    formResponse.textContent = "✅ Barang berhasil ditambahkan!";
-                }
-                
-                formResponse.classList.remove("alert-warning");
-                formResponse.classList.add("alert-success");
-                
-                // Tutup modal setelah sukses dan refresh data
-                setTimeout(() => {
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('barangModal'));
-                    if(modal) modal.hide();
-                    loadStockData();
-                }, 1000);
-                
-            } catch (err) {
-                console.error(err);
-                formResponse.textContent = `❌ Gagal: ${err.data?.message || 'Cek koneksi API.'}`;
-                formResponse.classList.remove("alert-warning");
-                formResponse.classList.add("alert-danger");
-            }
-        });
-
-        // --- EDIT (Populate Form) ---
-        async function editBarang(id) {
-            try {
-                const item = await handleFetch(`${STOCK_ENDPOINT}/${id}`, "GET");
-                
-                document.getElementById("barangId").value = item.id;
-                document.getElementById("namaBarang").value = item.namaBarang;
-                document.getElementById("kategori").value = item.kategori;
-                document.getElementById("harga").value = item.harga;
-                document.getElementById("jumlahStock").value = item.jumlahStock;
-                
-                document.getElementById("barangModalLabel").textContent = `Edit Barang: ${item.namaBarang}`;
-                document.getElementById("saveButton").textContent = "Update Stok";
-                
-                document.getElementById("formResponse").classList.add("d-none");
-
-                const modal = new bootstrap.Modal(document.getElementById('barangModal'));
-                modal.show();
-
-            } catch (err) {
-                alert(`Gagal memuat data barang: ${err.data?.message || 'Error jaringan.'}`);
-            }
-        }
-
-        // --- DELETE ---
-        async function deleteBarang(id, nama) {
-            if (!confirm(`Yakin ingin menghapus barang "${nama}"? Aksi ini tidak bisa dibatalkan.`)) {
+            if (!stockList || stockList.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">Stok kosong.</td></tr>';
                 return;
             }
 
-            try {
-                await handleFetch(`${STOCK_ENDPOINT}/${id}`, "DELETE");
-                alert(`✅ Barang "${nama}" berhasil dihapus.`);
-                loadStockData();
-            } catch (err) {
-                alert(`❌ Gagal menghapus barang: ${err.data?.message || 'Error jaringan.'}`);
+            tableBody.innerHTML = stockList
+                .map((item) => {
+                    // Logic: Jika stok <= 5, kasih warna merah
+                    const stockClass = item.jumlahStock <= 5 ? 'text-danger fw-bold' : '';
+                    
+                    return `
+                        <tr>
+                            <td>${item.id}</td>
+                            <td>${item.namaBarang}</td>
+                            <td><span class="badge bg-light text-dark border">${item.kategori}</span></td>
+                            <td class="text-end">${formatRupiah(item.harga)}</td>
+                            <td class="text-center ${stockClass}">${item.jumlahStock}</td>
+                            <td class="text-center">
+                                <button class="btn btn-sm btn-outline-warning me-1" onclick="editBarang(${item.id})">
+                                    Edit
+                                </button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="deleteBarang(${item.id}, '${item.namaBarang}')">
+                                    Hapus
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                })
+                .join("");
+        } catch (err) {
+            tableBody.innerHTML = `<tr><td colspan="6" class="text-center text-danger py-3">Gagal memuat API: ${API_BASE_URL}</td></tr>`;
+        }
+    }
+
+    // --- CREATE / UPDATE (Submit Form) ---
+    document.getElementById("barangForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const id = document.getElementById("barangId").value;
+        const isUpdate = id !== "";
+        const btn = e.target.querySelector('button[type="submit"]');
+        
+        const data = {
+            namaBarang: document.getElementById("namaBarang").value,
+            kategori: document.getElementById("kategori").value,
+            harga: parseFloat(document.getElementById("harga").value),
+            jumlahStock: parseInt(document.getElementById("jumlahStock").value),
+        };
+
+        if (isUpdate) data.id = parseInt(id);
+        
+        const formResponse = document.getElementById("formResponse");
+        formResponse.className = "alert mt-3 alert-info";
+        formResponse.textContent = "Sedang memproses...";
+        formResponse.classList.remove("d-none");
+
+        try {
+            btn.disabled = true;
+            if (isUpdate) {
+                await handleFetch(`${STOCK_ENDPOINT}/${id}`, "PUT", data);
+                formResponse.textContent = "✅ Stok diperbarui!";
+            } else {
+                await handleFetch(STOCK_ENDPOINT, "POST", data);
+                formResponse.textContent = "✅ Barang baru ditambahkan!";
             }
+            
+            formResponse.className = "alert mt-3 alert-success";
+            setTimeout(() => {
+                const modal = bootstrap.Modal.getInstance(document.getElementById('barangModal'));
+                if(modal) modal.hide();
+                loadStockData();
+            }, 1000);
+            
+        } catch (err) {
+            formResponse.className = "alert mt-3 alert-danger";
+            formResponse.textContent = `❌ Gagal: ${err.data?.message || 'Cek koneksi.'}`;
+        } finally {
+            btn.disabled = false;
         }
+    });
 
-        // Utility: Reset Form untuk mode Tambah Baru
-        function resetForm() {
-            document.getElementById("barangForm").reset();
-            document.getElementById("barangId").value = "";
-            document.getElementById("barangModalLabel").textContent = "Tambah Barang Baru";
-            document.getElementById("saveButton").textContent = "Simpan";
+    // --- EDIT ---
+    async function editBarang(id) {
+        try {
+            const item = await handleFetch(`${STOCK_ENDPOINT}/${id}`, "GET");
+            document.getElementById("barangId").value = item.id;
+            document.getElementById("namaBarang").value = item.namaBarang;
+            document.getElementById("kategori").value = item.kategori;
+            document.getElementById("harga").value = item.harga;
+            document.getElementById("jumlahStock").value = item.jumlahStock;
+            
+            document.getElementById("barangModalLabel").textContent = `Edit: ${item.namaBarang}`;
+            document.getElementById("saveButton").textContent = "Update Stok";
             document.getElementById("formResponse").classList.add("d-none");
-        }
 
-        // Panggil saat halaman dimuat
-        document.addEventListener("DOMContentLoaded", loadStockData);
-    </script>
+            new bootstrap.Modal(document.getElementById('barangModal')).show();
+        } catch (err) {
+            alert("Gagal memuat data barang.");
+        }
+    }
+
+    // --- DELETE ---
+    async function deleteBarang(id, nama) {
+        if (!confirm(`Hapus barang "${nama}"?`)) return;
+        try {
+            await handleFetch(`${STOCK_ENDPOINT}/${id}`, "DELETE");
+            loadStockData();
+        } catch (err) {
+            alert("Gagal menghapus barang.");
+        }
+    }
+
+    function resetForm() {
+        document.getElementById("barangForm").reset();
+        document.getElementById("barangId").value = "";
+        document.getElementById("barangModalLabel").textContent = "Tambah Barang Baru";
+        document.getElementById("saveButton").textContent = "Simpan";
+        document.getElementById("formResponse").classList.add("d-none");
+    }
+
+    document.addEventListener("DOMContentLoaded", loadStockData);
+</script>
 </body>
 </html>

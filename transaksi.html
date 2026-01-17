@@ -49,6 +49,7 @@
         color: #991b1b;
         border: 1px solid #ef4444;
       }
+
     </style>
     <script>
       // 1. Cek apakah ada data username di LocalStorage
@@ -126,118 +127,128 @@
       </div>
     </div>
 
-    <script>
-      const API_BASE_URL = "http://localhost:5000/api";
+    <script src="config.js"></script> <script>
+    // 1. Ambil URL secara dinamis dari config.js
+    const BASE_URL = window.CONFIG ? window.CONFIG.API_BASE_URL : "http://localhost:5127/api";
+    const API_BASE_URL = BASE_URL;
 
-      const formatRupiah = (angka) =>
+    const formatRupiah = (angka) =>
         new Intl.NumberFormat("id-ID", {
-          style: "currency",
-          currency: "IDR",
-          minimumFractionDigits: 0,
+            style: "currency",
+            currency: "IDR",
+            minimumFractionDigits: 0,
         }).format(angka);
 
-      // Load data motor
-      async function loadMotor() {
+    // 2. Load data motor (Mengambil tarif & kategori dari DB)
+    async function loadMotor() {
         const select = document.getElementById("motorSelect");
         select.innerHTML = `<option value="">Memuat data motor...</option>`;
         try {
-          const res = await fetch(`${API_BASE_URL}/motor`);
-          const data = await res.json();
-          select.innerHTML = `<option value="">Pilih Motor</option>`;
-          data.forEach((m) => {
-            const opt = document.createElement("option");
-            opt.value = m.id;
-            opt.dataset.tarif = m.tarif || 0;
-            opt.dataset.kategori = m.kategori;
-            opt.textContent = `Motor Kategori ${m.kategori} - ${formatRupiah(
-              m.tarif
-            )}`;
-            select.appendChild(opt);
-          });
+            const res = await fetch(`${API_BASE_URL}/motor`);
+            if (!res.ok) throw new Error("Gagal ambil data motor");
+            const data = await res.json();
+            
+            select.innerHTML = `<option value="">Pilih Kategori Motor</option>`;
+            data.forEach((m) => {
+                const opt = document.createElement("option");
+                opt.value = m.id;
+                opt.dataset.tarif = m.tarif || 0;
+                opt.dataset.kategori = m.kategori;
+                opt.textContent = `Motor ${m.kategori} - ${formatRupiah(m.tarif)}`;
+                select.appendChild(opt);
+            });
         } catch (err) {
-          console.error("Gagal memuat motor:", err);
-          select.innerHTML = `<option value="">Gagal memuat data</option>`;
+            console.error(err);
+            select.innerHTML = `<option value="">Gagal muat data. Cek API!</option>`;
         }
-      }
+    }
 
-      // Load data karyawan
-      async function loadKaryawan() {
+    // 3. Load data karyawan (Siapa yang nyuci?)
+    async function loadKaryawan() {
         const select = document.getElementById("karyawanSelect");
         select.innerHTML = `<option value="">Memuat data karyawan...</option>`;
         try {
-          const res = await fetch(`${API_BASE_URL}/karyawan`);
-          const data = await res.json();
-          select.innerHTML = `<option value="">Pilih Karyawan</option>`;
-          data.forEach((k) => {
-            const opt = document.createElement("option");
-            opt.value = k.id;
-            opt.textContent = `${k.nama} (${k.posisi})`;
-            select.appendChild(opt);
-          });
+            const res = await fetch(`${API_BASE_URL}/karyawan`);
+            if (!res.ok) throw new Error("Gagal ambil data karyawan");
+            const data = await res.json();
+            
+            select.innerHTML = `<option value="">Pilih Karyawan</option>`;
+            data.forEach((k) => {
+                const opt = document.createElement("option");
+                opt.value = k.id;
+                opt.textContent = `${k.nama} (${k.posisi || 'Operator'})`;
+                select.appendChild(opt);
+            });
         } catch (err) {
-          console.error("Gagal memuat karyawan:", err);
-          select.innerHTML = `<option value="">Gagal memuat data</option>`;
+            console.error(err);
+            select.innerHTML = `<option value="">Gagal muat data</option>`;
         }
-      }
+    }
 
-      // Auto update total harga saat motor dipilih
-      document.getElementById("motorSelect").addEventListener("change", (e) => {
+    // Auto update total harga saat motor dipilih
+    document.getElementById("motorSelect").addEventListener("change", (e) => {
         const selected = e.target.options[e.target.selectedIndex];
         const harga = parseInt(selected.dataset.tarif || 0);
-        document.getElementById("total").value = harga
-          ? formatRupiah(harga)
-          : "";
-      });
+        // Tampilkan harga di input readonly "total"
+        document.getElementById("total").value = harga ? formatRupiah(harga) : "";
+    });
 
-      // Submit transaksi
-      document
-        .getElementById("transaksiForm")
-        .addEventListener("submit", async (e) => {
-          e.preventDefault();
+    // 4. Submit transaksi ke database
+    document.getElementById("transaksiForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
 
-          const motorSelect = document.getElementById("motorSelect");
-          const karyawanSelect = document.getElementById("karyawanSelect");
+        const motorSelect = document.getElementById("motorSelect");
+        const karyawanSelect = document.getElementById("karyawanSelect");
+        const btnSubmit = e.target.querySelector('button[type="submit"]');
 
-          const motorId = parseInt(motorSelect.value);
-          const karyawanId = parseInt(karyawanSelect.value);
-          const total = parseInt(
-            motorSelect.options[motorSelect.selectedIndex].dataset.tarif || 0
-          );
-          const layanan = document.getElementById("layanan").value;
+        const motorId = parseInt(motorSelect.value);
+        const karyawanId = parseInt(karyawanSelect.value);
+        const total = parseInt(motorSelect.options[motorSelect.selectedIndex].dataset.tarif || 0);
+        const layanan = document.getElementById("layanan").value;
 
-          const data = { motorId, karyawanId, total, layanan };
+        if(!motorId || !karyawanId) {
+            alert("Pilih Motor dan Karyawan dulu, bro!");
+            return;
+        }
 
-          const respEl = document.getElementById("transaksiResponse");
-          respEl.className = "response-box";
-          respEl.textContent = "⏳ Menyimpan transaksi...";
+        const data = { motorId, karyawanId, total, layanan };
+        const respEl = document.getElementById("transaksiResponse");
+        
+        try {
+            btnSubmit.disabled = true;
+            respEl.className = "alert alert-info mt-3 d-block"; // Pake class Bootstrap biar rapi
+            respEl.textContent = "⏳ Menyimpan transaksi ke cloud...";
 
-          try {
             const res = await fetch(`${API_BASE_URL}/transaksi`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(data),
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(data),
             });
+            
             const result = await res.json();
-
             if (!res.ok) throw result;
 
-            respEl.classList.add("success");
-            respEl.textContent = `✅ Transaksi Berhasil!\nMotor ID: ${
-              result.motorId
-            }\nKaryawan: ${result.karyawanTerkait?.nama}\nTotal: ${formatRupiah(
-              result.total
-            )}`;
-          } catch (err) {
-            respEl.classList.add("error");
-            respEl.textContent = err.message || "❌ Gagal menyimpan transaksi.";
-          }
-        });
+            respEl.className = "alert alert-success mt-3 d-block";
+            respEl.innerHTML = `
+                <strong>✅ Berhasil!</strong><br>
+                Layanan: ${result.layanan}<br>
+                Petugas: ${result.karyawanTerkait?.nama || 'Terdaftar'}<br>
+                Biaya: ${formatRupiah(result.total)}
+            `;
+            
+            e.target.reset(); // Kosongkan form setelah sukses
+        } catch (err) {
+            respEl.className = "alert alert-danger mt-3 d-block";
+            respEl.textContent = "❌ Gagal: " + (err.message || "Pastikan server aktif");
+        } finally {
+            btnSubmit.disabled = false;
+        }
+    });
 
-      // Jalankan saat halaman siap
-      document.addEventListener("DOMContentLoaded", () => {
+    document.addEventListener("DOMContentLoaded", () => {
         loadMotor();
         loadKaryawan();
-      });
-    </script>
+    });
+</script>
   </body>
 </html>
